@@ -59,6 +59,13 @@ voice:
     edge_tts:
       en: "en-US-GuyNeural"
       hi: "hi-IN-MadhurNeural"
+    "60db":
+      voice_id: "fbb75ed2-975a-40c7-9e06-38e30524a9a1"
+      settings:
+        stability: 50
+        similarity: 80
+        speed: 1.0
+        enhance: true
 
 captions:
   highlight_color: "#FFFF00"

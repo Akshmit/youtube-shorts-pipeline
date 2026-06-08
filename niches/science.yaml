@@ -49,6 +49,13 @@ voice:
   suggested_voices:
     edge_tts:
       en: "en-US-GuyNeural"
+    "60db":
+      voice_id: "fbb75ed2-975a-40c7-9e06-38e30524a9a1"
+      settings:
+        stability: 65
+        similarity: 85
+        speed: 1.0
+        enhance: true
 captions:
   highlight_color: "#22D1EE"
   words_per_group: 4

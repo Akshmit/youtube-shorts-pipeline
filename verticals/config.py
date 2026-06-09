@@ -210,6 +210,10 @@ def get_minimax_key() -> str:
     return _get_key("MINIMAX_API_KEY")
 
 
+def get_60db_key() -> str:
+    return _get_key("SIXTYDB_API_KEY")
+
+
 def get_gemini_key() -> str:
     return _get_key("GEMINI_API_KEY")
 
@@ -261,13 +265,19 @@ def run_setup():
     if key:
         config["ANTHROPIC_API_KEY"] = key
 
-    print("\n2. ElevenLabs API key (optional — fallback to macOS 'say' if omitted)")
+    print("\n2. ElevenLabs API key (optional — premium narration; falls back to Edge TTS / say)")
     print("   Pro account required for server use. https://elevenlabs.io/settings/api-keys")
     key = input("   ELEVENLABS_API_KEY (press Enter to skip): ").strip()
     if key:
         config["ELEVENLABS_API_KEY"] = key
 
-    print("\n3. Google Gemini API key (required — used for AI b-roll image generation)")
+    print("\n3. 60db API key (optional — low-cost TTS, native Indic-language voices)")
+    print("   Get yours at: https://60db.ai")
+    key = input("   SIXTYDB_API_KEY (press Enter to skip): ").strip()
+    if key:
+        config["SIXTYDB_API_KEY"] = key
+
+    print("\n4. Google Gemini API key (required — used for AI b-roll image generation)")
     print("   Get yours at: https://aistudio.google.com/apikey")
     key = input("   GEMINI_API_KEY: ").strip()
     if key:

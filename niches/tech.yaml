@@ -102,6 +102,13 @@ voice:
         stability: 0.4
         similarity_boost: 0.85
         style: 0.3
+    "60db":
+      voice_id: "fbb75ed2-975a-40c7-9e06-38e30524a9a1"
+      settings:
+        stability: 40
+        similarity: 85
+        speed: 1.05
+        enhance: true
 
 # ─────────────────────────────────────────────────────
 # Caption Intelligence

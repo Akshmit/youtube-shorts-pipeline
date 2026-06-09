@@ -1,16 +1,26 @@
-"""Multi-provider TTS — Edge TTS (free default), ElevenLabs (premium), macOS say (fallback).
+"""Multi-provider TTS — Edge TTS (free default), ElevenLabs (premium), MiniMax, 60db (Indic + low cost), macOS say (fallback).
 
 Edge TTS is the recommended default: free, cross-platform, 300+ voices, no API key.
 ElevenLabs is premium: most natural, requires API key.
+MiniMax is an alternative paid provider with streaming TTS.
+60db is an alternative paid provider with native Indic-language voices and a lower per-character cost.
 macOS say is the last-resort fallback.
 """
 
+import base64
 import os
 from pathlib import Path
 
 import requests
 
-from .config import VOICE_ID_EN, VOICE_ID_HI, get_elevenlabs_key, get_minimax_key, run_cmd
+from .config import (
+    VOICE_ID_EN,
+    VOICE_ID_HI,
+    get_60db_key,
+    get_elevenlabs_key,
+    get_minimax_key,
+    run_cmd,
+)
 from .log import log
 from .retry import with_retry
 
@@ -214,6 +224,74 @@ def _generate_minimax(
 
 
 # ─────────────────────────────────────────────────────
+# 60db — Indic-language native, low cost
+# ─────────────────────────────────────────────────────
+
+# Documented default voice — "Zara" (Hindi female) per /default-voices.
+VOICE_ID_60DB_DEFAULT = "fbb75ed2-975a-40c7-9e06-38e30524a9a1"
+
+
+@with_retry(max_retries=3, base_delay=2.0)
+def _call_60db(script: str, voice_id: str, api_key: str, settings: dict | None = None) -> bytes:
+    """Call 60db /tts-synthesize and return raw audio bytes.
+
+    Native 60db parameter ranges (per https://docs.60db.ai/api-reference/tts/text-to-speech):
+        stability:  0..100 (lower = more expressive)
+        similarity: 0..100 (voice match fidelity)
+        speed:      0.5..2.0
+    """
+    s = settings or {}
+    payload = {
+        "text": script,
+        "voice_id": voice_id,
+        "enhance": bool(s.get("enhance", True)),
+        "speed": float(s.get("speed", 1.0)),
+        "stability": int(s.get("stability", 50)),
+        "similarity": int(s.get("similarity", 75)),
+        "output_format": "mp3",  # pinned — captions.py / assemble.py expect MP3
+    }
+    r = requests.post(
+        "https://api.60db.ai/tts-synthesize",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        json=payload,
+        timeout=120,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"60db {r.status_code}: {r.text[:200]}")
+
+    body = r.json()
+    if not body.get("success", True) or not body.get("audio_base64"):
+        raise RuntimeError(f"60db returned no audio: {body.get('message', 'unknown')}")
+    try:
+        return base64.b64decode(body["audio_base64"])
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"60db audio_base64 decode failed: {exc}") from exc
+
+
+def _generate_60db(
+    script: str, out_dir: Path, lang: str,
+    voice_id: str = "", settings: dict | None = None
+) -> Path:
+    """Generate voiceover via 60db."""
+    api_key = get_60db_key()
+    if not api_key:
+        raise RuntimeError("SIXTYDB_API_KEY not set")
+
+    vid = voice_id or VOICE_ID_60DB_DEFAULT
+    out_path = out_dir / f"voiceover_{lang}.mp3"
+
+    log(f"Generating {lang} voiceover via 60db (voice: {vid})...")
+    audio_bytes = _call_60db(script, vid, api_key, settings)
+    out_path.write_bytes(audio_bytes)
+    log(f"60db voiceover saved: {out_path.name}")
+    return out_path
+
+
+# ─────────────────────────────────────────────────────
 # macOS say — last resort fallback
 # ─────────────────────────────────────────────────────
 
@@ -237,7 +315,7 @@ def get_tts_provider(name: str | None = None) -> str:
     """Resolve which TTS provider to use.
 
     Priority: explicit name > TTS_PROVIDER env > auto-detect.
-    Auto-detect tries: edge_tts > elevenlabs > say.
+    Auto-detect tries: edge_tts > minimax > elevenlabs > 60db > say.
     """
     if name and name != "auto":
         return name.lower()
@@ -263,6 +341,9 @@ def get_tts_provider(name: str | None = None) -> str:
 
     if get_elevenlabs_key():
         return "elevenlabs"
+
+    if get_60db_key():
+        return "60db"
 
     # macOS say as last resort
     import shutil
@@ -313,6 +394,9 @@ def generate_voiceover(
             elif get_elevenlabs_key():
                 log("Falling back to ElevenLabs...")
                 provider = "elevenlabs"
+            elif get_60db_key():
+                log("Falling back to 60db...")
+                provider = "60db"
             else:
                 log("Falling back to macOS say...")
                 return _generate_say(script, out_dir)
@@ -329,6 +413,9 @@ def generate_voiceover(
             if get_elevenlabs_key():
                 log("Falling back to ElevenLabs...")
                 provider = "elevenlabs"
+            elif get_60db_key():
+                log("Falling back to 60db...")
+                provider = "60db"
             else:
                 log("Falling back to macOS say...")
                 return _generate_say(script, out_dir)
@@ -342,6 +429,22 @@ def generate_voiceover(
             )
         except Exception as e:
             log(f"ElevenLabs failed: {e}")
+            if get_60db_key():
+                log("Falling back to 60db...")
+                provider = "60db"
+            else:
+                log("Falling back to macOS say...")
+                return _generate_say(script, out_dir)
+
+    if provider == "60db":
+        try:
+            return _generate_60db(
+                script, out_dir, lang,
+                voice_id=voice_config.get("voice_id", ""),
+                settings=voice_config.get("settings"),
+            )
+        except Exception as e:
+            log(f"60db failed: {e}")
             log("Falling back to macOS say...")
             return _generate_say(script, out_dir)
 

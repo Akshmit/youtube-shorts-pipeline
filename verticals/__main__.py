@@ -298,6 +298,67 @@ def cmd_niches(args):
             print(f"    {' ':20s}  {desc}")
 
 
+def cmd_voices(args):
+    """List voices available for a TTS provider.
+
+    Currently only 60db is supported — it exposes GET /myvoices and
+    GET /default-voices. Edge TTS voices are language-coded strings (see
+    EDGE_VOICES in tts.py); ElevenLabs voice IDs come from the ElevenLabs
+    dashboard.
+    """
+    provider = (args.provider or "").lower()
+    if provider not in ("60db", "sixtydb"):
+        print("  Error: --provider 60db is the only listing currently supported.")
+        print("  Edge voices: see EDGE_VOICES in verticals/tts.py.")
+        print("  ElevenLabs voices: https://elevenlabs.io/app/voice-library")
+        sys.exit(1)
+
+    import requests
+    from .config import get_60db_key
+
+    api_key = get_60db_key()
+    if not api_key:
+        print("  Error: SIXTYDB_API_KEY not set. Run setup or export the env var.")
+        sys.exit(1)
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+    endpoints = [
+        ("Default voices", "https://api.60db.ai/default-voices"),
+        ("My voices",      "https://api.60db.ai/myvoices"),
+    ]
+
+    def _print_voice_row(v: dict):
+        labels = v.get("labels") or {}
+        lang = labels.get("language_name") or labels.get("language") or "?"
+        gender = labels.get("gender") or "?"
+        accent = labels.get("accent") or "?"
+        model = v.get("model") or "?"
+        category = v.get("category") or "?"
+        name = v.get("name") or "?"
+        vid = v.get("voice_id") or "?"
+        print(f"    {vid}  {name:18.18}  {lang:10.10}  {gender:6.6}  {accent:10.10}  {model:14.14}  {category}")
+
+    for title, url in endpoints:
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+        except Exception as exc:
+            print(f"\n  {title}: request failed — {exc}")
+            continue
+        if r.status_code != 200:
+            print(f"\n  {title}: HTTP {r.status_code} — {r.text[:120]}")
+            continue
+        body = r.json()
+        items = body.get("data") or []
+        print(f"\n  {title} ({len(items)}):")
+        if not items:
+            print("    (none)")
+            continue
+        print(f"    {'voice_id':36}  {'name':18}  {'language':10}  {'gender':6}  {'accent':10}  {'model':14}  category")
+        print(f"    {'-' * 36}  {'-' * 18}  {'-' * 10}  {'-' * 6}  {'-' * 10}  {'-' * 14}  {'-' * 8}")
+        for v in items:
+            _print_voice_row(v)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Verticals v3 — AI-Native Vertical Video Engine",
@@ -326,7 +387,7 @@ def main():
     p_produce = sub.add_parser("produce", help="Generate video from draft")
     p_produce.add_argument("--draft", required=True)
     p_produce.add_argument("--lang", default="en", choices=["en", "hi", "es", "pt", "de", "fr", "ja", "ko"])
-    p_produce.add_argument("--voice", default=None, help="TTS: edge, elevenlabs, say")
+    p_produce.add_argument("--voice", default=None, help="TTS: edge, elevenlabs, 60db, say")
     p_produce.add_argument("--script", default=None, help="Override script text")
     p_produce.add_argument("--force", action="store_true", help="Redo all stages")
 
@@ -342,7 +403,7 @@ def main():
     p_run.add_argument("--niche", default="general", help=niche_help)
     p_run.add_argument("--platform", default="shorts", choices=["shorts", "reels", "tiktok", "all"])
     p_run.add_argument("--provider", default=None, help="LLM: claude, gemini, openai, ollama")
-    p_run.add_argument("--voice", default=None, help="TTS: edge, elevenlabs, say")
+    p_run.add_argument("--voice", default=None, help="TTS: edge, elevenlabs, 60db, say")
     p_run.add_argument("--lang", default="en", choices=["en", "hi", "es", "pt", "de", "fr", "ja", "ko"])
     p_run.add_argument("--dry-run", action="store_true")
     p_run.add_argument("--context", default="")
@@ -357,6 +418,10 @@ def main():
     # niches
     sub.add_parser("niches", help="List available niche profiles")
 
+    # voices
+    p_voices = sub.add_parser("voices", help="List TTS voices (currently: 60db)")
+    p_voices.add_argument("--provider", default="60db", help="TTS provider (only '60db' supported)")
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -366,9 +431,12 @@ def main():
         parser.print_help()
         return
 
-    # Handle niches command
+    # Handle utility commands that don't need first-run setup
     if args.cmd == "niches":
         cmd_niches(args)
+        return
+    if args.cmd == "voices":
+        cmd_voices(args)
         return
 
     maybe_run_setup(args)

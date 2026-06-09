@@ -99,7 +99,7 @@ Scopes requested: `youtube.upload`, `youtube.force-ssl` (minimum for upload + ca
 
 ### First run — automatic setup wizard
 ```bash
-python3 python -m verticals draft --news "your topic here"
+python3 -m verticals draft --topic "your topic here"
 ```
 
 On first run (no `~/.verticals/config.json`), the wizard will prompt for all keys and run the YouTube OAuth flow.
@@ -108,16 +108,16 @@ On first run (no `~/.verticals/config.json`), the wizard will prompt for all key
 
 ```bash
 # Draft only (generate script + metadata)
-python3 python -m verticals draft --news "your topic here"
+python3 -m verticals draft --topic "your topic here"
 
 # Produce (generate video from draft)
-python3 python -m verticals produce --draft ~/.verticals/drafts/<id>.json
+python3 -m verticals produce --draft ~/.verticals/drafts/<id>.json
 
 # Upload
-python3 python -m verticals upload --draft ~/.verticals/drafts/<id>.json
+python3 -m verticals upload --draft ~/.verticals/drafts/<id>.json
 
 # Full pipeline in one command
-python3 python -m verticals run --news "your topic here"
+python3 -m verticals run --topic "your topic here"
 ```
 
 ---

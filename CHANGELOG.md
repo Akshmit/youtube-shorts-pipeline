@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.1.0] - 2026-06-10
+
+Community providers, CJK captions, and reliability fixes.
+
+### Added
+- MiniMax as an optional LLM and TTS provider behind `MINIMAX_API_KEY`, with mocked tests (#12, thanks @octo-patch).
+- 60db as an optional TTS provider behind `SIXTYDB_API_KEY`, including per-niche voice settings and a `python -m verticals voices --provider 60db` listing command (#20, thanks @Dev-develope).
+- `examples/` directory with two worked end-to-end examples — a full tech-news Short and a zero-cost Ollama draft with topic discovery — referenced from the README (#8).
+- `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) is now accepted as a Claude CLI credential source for headless/CI use, and the README documents all three Claude auth paths (#5).
+
+### Changed
+- Niche profile `captions.font_family` and `captions.font_size` are now wired into the generated ASS style, fixing CJK and other non-Latin caption rendering (#13, thanks @chimaek).
+- `edge-tts` pin bumped from `>=6.1,<7.0` to `>=7.0,<8.0`; 6.x clients are rejected by Microsoft's endpoint with HTTP 403.
+- TTS fallback chain is now edge → minimax → elevenlabs → 60db → say, and auto-detect covers all providers.
+- `SKILL.md` and `references/setup.md` now use `--topic` (the `--news` spelling lingered there after the v3.0.1 CLI change) and the `python3 python -m verticals` typo is fixed (#14).
+
+### Fixed
+- Missing `GEMINI_API_KEY` no longer surfaces as a cryptic `403: Method doesn't allow unregistered callers` deep in b-roll generation: the pipeline now logs a clear message and uses fallback frames, thumbnails fail fast with an actionable error, and 403 responses include a hint about AI Studio vs Vertex credentials (#11).
+- ffmpeg builds without libass no longer crash video assembly; caption burn-in is skipped with a warning and the SRT is still uploaded.
+
 ## [3.0.1] - 2026-05-21
 
 Credibility and viral-traffic cleanup.

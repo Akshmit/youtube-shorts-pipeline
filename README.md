@@ -24,17 +24,17 @@ The biggest change: **Niche Intelligence**. Every stage of the pipeline now read
 
 Other highlights: multi provider LLM support (Claude, Gemini, GPT, Ollama local), free TTS via Edge TTS, YouTube upload, topic discovery, resumable stages, and a local-first config model.
 
-## Current Release: v3.0.1
+## Current Release: v3.1.0
 
-v3.0.1 is a credibility cleanup for the public repo after the first viral traffic spike. The docs now describe only the shipped local pipeline, the repo includes a physical MIT license file, and utility commands such as `--help` and `--niches` work without triggering first-run setup.
+v3.1.0 brings community-contributed providers and reliability fixes: MiniMax (LLM + TTS) and 60db (TTS) as optional providers, niche-aware caption fonts so CJK and other non-Latin scripts render correctly, a working `edge-tts` pin (6.x is rejected by Microsoft with 403s), and clearer errors for the most-reported setup problems.
 
 Implemented today:
 
 - research with DuckDuckGo plus optional source scraping
-- script and metadata generation through Claude, Gemini, GPT, Ollama, or Claude CLI
+- script and metadata generation through Claude, Gemini, GPT, Ollama, MiniMax, LiteLLM, or Claude CLI
 - b roll and thumbnail image generation through Gemini Imagen, with fallback frames
-- voiceover through Edge TTS, ElevenLabs, or macOS `say`
-- Whisper captions with ASS burn-in plus SRT export
+- voiceover through Edge TTS, ElevenLabs, MiniMax, 60db, or macOS `say`
+- Whisper captions with ASS burn-in plus SRT export, niche-configurable fonts
 - ffmpeg assembly with Ken Burns motion, background music, and voice ducking
 - private-by-default YouTube upload
 
@@ -156,6 +156,13 @@ The old `--news` flag still works for backwards compatibility, but `--topic` is 
 
 Use [verticals.gg](https://verticals.gg) if you want the workflow without local setup.
 
+## Examples
+
+Two worked end-to-end examples with real commands and the exact output to expect at each stage live in [`examples/`](examples/):
+
+- [Tech news Short, full pipeline](examples/01-tech-news-short.md) — draft, produce, upload with the default providers
+- [Zero-cost draft with topic discovery](examples/02-free-draft-discovery.md) — trending topics plus a local Ollama draft, no paid keys
+
 ## CLI Commands
 
 ### Full pipeline (topic to published Short)
@@ -176,8 +183,8 @@ python -m verticals topics --niche tech --limit 20
 ### Useful flags
 ```
 --niche NAME         Niche profile (default: general)
---provider NAME      LLM provider: claude, gemini, openai, ollama (default: claude)
---voice NAME         TTS provider: edge, elevenlabs, say (default: edge)
+--provider NAME      LLM provider: claude, gemini, openai, ollama, minimax (default: claude)
+--voice NAME         TTS provider: edge, elevenlabs, minimax, 60db, say (default: edge)
 --platform NAME      Draft target: shorts, reels, tiktok, all (default: shorts)
 --lang CODE          Language: en, hi, es, pt, de, fr, ja, ko (default: en)
 --dry-run            Draft only, skip produce and upload
@@ -195,7 +202,8 @@ python -m verticals topics --niche tech --limit 20
 | **Gemini** (Google) | Free tier available | `GEMINI_API_KEY` | Good quality, generous free tier. |
 | **GPT** (OpenAI) | ~$0.01/script | `OPENAI_API_KEY` | Solid alternative. |
 | **Ollama** (local) | Free | Install Ollama + pull model | No API key needed. Quality varies by model. |
-| **Claude CLI** | Free w/ Max sub | Install Claude Code | Uses Claude Max subscription, no API key. |
+| **Claude CLI** | Free w/ Max sub | Install Claude Code | Uses Claude Max subscription, no API key. See [Claude authentication](#claude-authentication). |
+| **MiniMax** | Pay-as-you-go | `MINIMAX_API_KEY` | OpenAI-compatible API. |
 
 ### TTS (voiceover)
 
@@ -203,7 +211,17 @@ python -m verticals topics --niche tech --limit 20
 |----------|------|-------|-------|
 | **Edge TTS** | Free | None | **Recommended default.** 300+ voices, cross platform. |
 | **ElevenLabs** | ~$0.05/video | `ELEVENLABS_API_KEY` | Most natural. Premium. |
+| **MiniMax** | Pay-as-you-go | `MINIMAX_API_KEY` | Streaming TTS, English voices. |
+| **60db** | Pay-as-you-go | `SIXTYDB_API_KEY` | Native Indic-language voices, low per-character cost. List voices: `python -m verticals voices --provider 60db`. |
 | **macOS say** | Free | macOS only | Basic fallback. |
+
+### Claude authentication
+
+The `claude` provider works with any one of these, checked in order:
+
+1. `ANTHROPIC_API_KEY` — a standard Anthropic API key from [console.anthropic.com](https://console.anthropic.com/settings/keys). This is **not** the same thing as a Claude Code OAuth token; the two are not interchangeable.
+2. A logged-in Claude Code CLI (`claude login` with a Claude Max subscription). The pipeline shells out to `claude -p` and no API key is needed.
+3. `CLAUDE_CODE_OAUTH_TOKEN` — a long-lived token from `claude setup-token`, with the `claude` CLI installed. Useful for CI and headless machines. The token is consumed by the CLI, not sent to the Anthropic API directly.
 
 ### Visuals (b roll)
 
@@ -240,12 +258,17 @@ All keys stored in `~/.verticals/config.json` with 0600 permissions:
 
 | Variable | Required | Used By |
 |----------|----------|---------|
-| `ANTHROPIC_API_KEY` | If using Claude | Script generation |
+| `ANTHROPIC_API_KEY` | If using Claude API | Script generation |
+| `CLAUDE_CODE_OAUTH_TOKEN` | If using Claude CLI headless | Script generation (via `claude` CLI) |
 | `GEMINI_API_KEY` | If using Gemini visuals/LLM | B roll + thumbnails |
 | `OPENAI_API_KEY` | If using GPT | Script generation |
 | `ELEVENLABS_API_KEY` | If using ElevenLabs | Premium voiceover |
+| `MINIMAX_API_KEY` | If using MiniMax | Script generation + voiceover |
+| `SIXTYDB_API_KEY` | If using 60db | Voiceover |
 
 Environment variables override config file values.
+
+Note on `GEMINI_API_KEY`: it must be an AI Studio key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Vertex AI or service-account credentials fail with `403: Method doesn't allow unregistered callers`. The same 403 appears when the key is simply not set in the environment the pipeline runs in (a common cause inside Docker — pass it with `docker run -e GEMINI_API_KEY=...`).
 
 ## Topic Discovery
 

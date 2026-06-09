@@ -131,7 +131,15 @@ def has_claude_cli() -> bool:
 
 
 def _has_claude_max_credentials() -> bool:
-    """Check if Claude Max OAuth credentials exist."""
+    """Check if Claude Code OAuth credentials are available.
+
+    Two sources count:
+    - CLAUDE_CODE_OAUTH_TOKEN env var (created via `claude setup-token`,
+      picked up by the claude CLI automatically — useful for CI/headless)
+    - ~/.claude/.credentials.json (created via `claude login` / Claude Max)
+    """
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        return True
     if not CLAUDE_CREDENTIALS.exists():
         return False
     try:
@@ -198,7 +206,9 @@ def get_claude_backend() -> str:
     raise RuntimeError(
         "No Claude access found. Either:\n"
         "  1. Set ANTHROPIC_API_KEY in env or ~/.verticals/config.json\n"
-        "  2. Log in to Claude Code (claude login) with a Claude Max subscription"
+        "  2. Log in to Claude Code (claude login) with a Claude Max subscription\n"
+        "  3. Set CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) with the\n"
+        "     claude CLI installed"
     )
 
 
